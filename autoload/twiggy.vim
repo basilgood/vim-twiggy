@@ -827,7 +827,7 @@ endfunction
 "     {{{3 Render
 function! s:Render() abort
   redraw
-
+  let b:git_dir = FugitiveFind()
   if exists('b:git_dir') && &filetype !=# 'twiggy'
     let t:twiggy_git_dir = b:git_dir
     let t:twiggy_git_cmd = FugitiveShellCommand()
@@ -948,8 +948,8 @@ function! s:Render() abort
 
   augroup twiggy
     autocmd!
-    autocmd CursorMoved twiggy://* call s:show_branch_details()
-    autocmd CursorMoved twiggy://* call s:update_last_branch_under_cursor()
+    autocmd CursorHold twiggy://* call s:show_branch_details()
+    autocmd CursorHold twiggy://* call s:update_last_branch_under_cursor()
     autocmd BufReadPost,BufEnter,VimResized twiggy://* call <SID>Refresh()
   augroup END
 
@@ -1012,6 +1012,8 @@ function! s:Render() abort
       let g:twiggy_git_log_command  = 'GV'
     elseif exists(':Gitv')
       let g:twiggy_git_log_command = 'Gitv'
+    else
+      let g:twiggy_git_log_command = 'tab G log --oneline --graph --decorate --all'
     endif
   endif
 
@@ -1133,31 +1135,37 @@ endfunction
 
 "     {{{3 Branch
 function! twiggy#Branch(...) abort
-  if len(a:000)
-    let current_branch = s:get_current_branch()
-    let f = s:branch_exists(a:1) ? '' : '-b '
-    call s:git_cmd('checkout ' . f . join(a:000), 0)
-    call s:RenderOutputBuffer()
-    if exists('t:twiggy_bufnr')
-      call s:Refresh()
-    end
-    redraw
-    echo 'Moved from ' . current_branch . ' to ' . a:1
+  if a:0  " Check if arguments are provided
+    call s:checkout_branch(a:1)
   else
-    let twiggy_bufnr = exists('t:twiggy_bufnr') ? t:twiggy_bufnr : 0
-    if !twiggy_bufnr
-      call s:Render()
-    else
-      if twiggy_bufnr ==# bufnr('')
-        " :Twiggy closes as well as opens if you the twiggy buffer is focused
-        call s:Close()
-      else
-        " If twiggy is open, :Twiggy will focus the twiggy buffer then redraw " it
-        let t:twiggy_git_dir = b:git_dir
-        let t:twiggy_git_cmd = FugitiveShellCommand()
-        call s:buffocus(t:twiggy_bufnr)
-      end
-    endif
+    call s:toggleTwiggyBuffer()
+  endif
+endfunction
+
+" Helper functions
+
+function! s:checkout_branch(branch) abort
+  let current_branch = s:get_current_branch()
+  let f = s:branch_exists(a:branch) ? '' : '-b '
+  call s:git_cmd('checkout ' . f . a:branch, 0)
+  call s:RenderOutputBuffer()
+  if exists('t:twiggy_bufnr')
+    call s:Refresh()
+  endif
+  redraw
+  echo 'Moved from ' . current_branch . ' to ' . a:branch
+endfunction
+
+function! s:toggleTwiggyBuffer() abort
+  let twiggy_bufnr = exists('t:twiggy_bufnr') ? t:twiggy_bufnr : 0
+  if twiggy_bufnr == 0
+    call s:Render()
+  elseif twiggy_bufnr == bufnr('')
+    call s:Close()
+  else
+    let t:twiggy_git_dir = b:git_dir
+    let t:twiggy_git_cmd = FugitiveShellCommand()
+    call s:buffocus(t:twiggy_bufnr)
   endif
 endfunction
 
